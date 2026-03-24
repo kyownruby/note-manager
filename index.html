@@ -253,11 +253,24 @@ function extractNoteKey(url) {
 async function fetchCommentsForNote(noteKey) {
   const apiUrl = `https://note.com/api/v3/notes/${noteKey}/note_comments`;
   const res = await fetchWithCors(apiUrl);
-  if (!res || !res.ok) return [];
+  if (!res || !res.ok) {
+    console.warn(`[note-mgr] Comment API failed for ${noteKey}:`, res?.status);
+    return [];
+  }
   try {
-    const data = await res.json();
-    return data.data?.note_comments || data.data?.comments || data.data || [];
-  } catch(e) { return []; }
+    const text = await res.text();
+    const data = JSON.parse(text);
+    console.log(`[note-mgr] Comments for ${noteKey}:`, data);
+    // v3 APIの様々なレスポンス構造に対応
+    const comments = data.data?.note_comments || data.data?.comments || data.note_comments || data.comments || [];
+    if (Array.isArray(comments)) return comments;
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data)) return data;
+    return [];
+  } catch(e) {
+    console.warn(`[note-mgr] JSON parse error for ${noteKey}:`, e.message);
+    return [];
+  }
 }
 
 function filterUnrepliedComments(comments, ownerUrlname) {
